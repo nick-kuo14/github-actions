@@ -1,0 +1,70 @@
+name: Build and Push Docker
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-docker:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup
+        id: config
+        uses: actions/github-script@v7
+        env:
+          GITHUB_REF_NAME: ${{ github.ref_name }}
+        with:
+          script: |-
+            const {
+              GITHUB_REF_NAME: ref_name,
+            } = process.env
+
+            core.setOutput('nproc', require('os').cpus().length * 2 + 1)
+            core.setOutput('ref_name', ref_name)
+            core.setOutput('version', context.sha.slice(0, 7))
+
+      - name: Build Docker image
+        run: |
+          echo "Building Docker image..."
+          echo "My variable is ${{ vars.TEST }}"
+          echo "custom ref_name is ${{ steps.config.outputs.ref_name }}"
+          echo "custom version is ${{ steps.config.outputs.version }}"
+
+      - name: Checkout latest maxmind
+        id: maxmind
+        working-directory: fixtures/maxmind
+        run: |-
+          git remote update
+          git checkout origin/main
+          ref=$(git rev-parse --short HEAD)
+
+          echo check github workspace... ${{ github.workspace }}
+          cd ${{ github.workspace }}
+          git diff --exit-code || echo "ref=$ref" >> $GITHUB_OUTPUT
+          echo "changed=hichanged" >> $GITHUB_OUTPUT
+          echo "changed2=hichanged2"
+
+      - name: Create commit
+        # if: ${{ steps.maxmind.outputs.ref }}
+        run: |-
+          echo go ${{ steps.maxmind.outputs.ref }}
+          echo changed ${{ steps.maxmind.outputs.changed }}
+          echo changed2 ${{ steps.maxmind.outputs.changed2 }}
+
+      - name: Set up Python 3.13
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Test python
+        id: test-python
+        shell: python
+        run: |-
+          print("Hello world!")
+          import platform
+          print(platform.python_version())
